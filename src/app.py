@@ -1,3 +1,5 @@
+"""FastAPI server for the model inference."""
+
 # mypy: disable-error-code="import-not-found,misc"
 
 from fastapi import FastAPI
