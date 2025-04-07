@@ -9,6 +9,8 @@ readme = "README.md"
 license = {file = "LICENSE"}
 
 dependencies = [
+    "fastapi>=0.115.12",
+    "matplotlib>=3.10.1",
     "numpy>=2.2.4",
     "pre-commit>=4.2.0",
     "torch>=2.6.0",
