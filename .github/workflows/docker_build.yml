@@ -2,7 +2,7 @@ name: Build Docker Image
 
 on:
   workflow_run:
-    workflows: ["Run Pre-commit Checks", "Run Pytest"]
+    workflows: ["Run Pre-commit Checks"]
     types:
       - completed
 
