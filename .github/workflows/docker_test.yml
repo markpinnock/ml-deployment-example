@@ -28,7 +28,7 @@ jobs:
       - name: Run container tests
         run: |
           # Start the container
-          docker run -d -p 8000:8000 \
+          docker run -d --name ml-api -p 8000:8000 \
             ghcr.io/${{ github.repository }}:${{ github.sha }}
 
           # Wait for container to be ready
