@@ -1,13 +1,15 @@
 name: Build Docker Image
 
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Run Pre-commit Checks", "Run Pytest"]
+    types:
+      - completed
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Login to GitHub Container Registry
