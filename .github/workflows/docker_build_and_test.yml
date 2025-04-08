@@ -54,14 +54,14 @@ jobs:
       - name: Run container tests
         run: |
           # Start the container
-          docker run -d --name ml-api -p 8000:8000 \
+          docker run -d --name ml-api -p 80:80 \
             ghcr.io/${{ github.repository }}:${{ github.sha }}
 
           # Wait for container to be ready
           sleep 10
 
           # Test the API health endpoint
-          curl -f http://localhost:8000/health || exit 1
+          curl -f http://0.0.0.0:80 || exit 1
 
           # Clean up
           docker stop ml-api
