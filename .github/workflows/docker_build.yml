@@ -3,8 +3,6 @@ name: Build Docker Image
 on:
   workflow_run:
     workflows: ["Run Pre-commit Checks"]
-    branches:
-      - main
     types:
       - completed
 
