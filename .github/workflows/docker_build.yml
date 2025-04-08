@@ -28,7 +28,6 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ env.BRANCH_NAME }}
             ghcr.io/${{ github.repository }}:${{ github.sha }}
 
       - name: Image digest
