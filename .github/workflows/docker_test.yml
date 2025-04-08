@@ -3,6 +3,8 @@ name: Test Docker Image
 on:
   workflow_run:
     workflows: ["Build Docker Image"]
+    branches:
+      - main
     types:
       - completed
 
