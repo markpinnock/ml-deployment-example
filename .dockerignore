@@ -1,0 +1,11 @@
+.ipynb_checkpoints
+__pycache__
+*.egg-info/
+.vscode
+requirements.txt
+.env
+.venv
+.mypy_cache
+.ruff_cache
+.pytest_cache
+.github
