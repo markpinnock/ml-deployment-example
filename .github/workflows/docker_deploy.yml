@@ -24,7 +24,13 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Pull Docker image
-        run: docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+        run:
+          docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+      - name: Tag Docker image
+        run:
+          docker tag ghcr.io/${{ github.repository }}:${{ github.sha }} \
+          ${{ secrets.DOCKER_USERNAME }}/${{ github.repository }}:latest
 
       - name: Push to Docker Hub
         run:
