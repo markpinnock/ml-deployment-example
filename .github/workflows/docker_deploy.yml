@@ -19,11 +19,11 @@ jobs:
 
       - name: Pull Docker image
         run:
-          docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+          docker pull ghcr.io/${{ github.repository }}:3ab392ec93ee58352d408c16810708094c9b43e6
 
       - name: Tag Docker image
         run:
-          docker tag ghcr.io/${{ github.repository }}:${{ github.sha }} \
+          docker tag ghcr.io/${{ github.repository }}:3ab392ec93ee58352d408c16810708094c9b43e6 \
           ${{ secrets.DOCKER_USERNAME }}/${{ github.repository }}:latest
 
       - name: Login to Docker Hub
