@@ -1,7 +1,7 @@
 name: Deploy Docker Image
 
 on:
-  push:
+  pull_request:
     branches:
       - main
 
