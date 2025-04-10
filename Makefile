@@ -21,21 +21,21 @@ pip_compile:
 
 
 # Build docker image
-.PHONY: build_docker
-build_docker: pip_compile
+.PHONY: build
+build:
 	docker build -t $(DOCKER_USERNAME)/$(IMAGE_NAME):$(COMMIT_HASH) \
 	-t $(DOCKER_USERNAME)/$(IMAGE_NAME):latest .
 
 
 # Run docker image locally
-.PHONY: run_docker
-run_docker:
+.PHONY: run
+run:
 	docker run -d -p 80:80 ml-deployment:latest
 
 
 # Build docker image and push to DockerHub
 .PHONY: build_and_push
-build_and_push: build_docker
+build_and_push: build
 	docker login -u $(DOCKER_USERNAME) -p $(DOCKER_PASSWORD)
 	docker push $(DOCKER_USERNAME)/$(IMAGE_NAME):$(COMMIT_HASH)
 	docker push $(DOCKER_USERNAME)/$(IMAGE_NAME):latest
