@@ -7,10 +7,9 @@ name = "inference-app"
 version = "0.1.0"
 readme = "README.md"
 license = {file = "LICENSE"}
+requires-python = ">=3.12"
 
 dependencies = [
     "pip>=24.2",
     "fastapi[standard]>=0.115.12",
 ]
-
-requires-python = ">=3.12"
