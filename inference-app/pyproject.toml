@@ -9,6 +9,7 @@ readme = "README.md"
 license = {file = "LICENSE"}
 
 dependencies = [
+    "pip==24.2",
     "fastapi[standard]>=0.115.12",
 ]
 
