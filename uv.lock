@@ -321,18 +321,18 @@ name = "ml-deployment-example"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "inference-app" },
     { name = "pip" },
 ]
 
 [package.optional-dependencies]
 dev = [
-    { name = "inference-app" },
     { name = "pre-commit" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "inference-app", marker = "extra == 'dev'", editable = "inference-app" },
+    { name = "inference-app", editable = "inference-app" },
     { name = "pip", specifier = ">=24.2" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.2.0" },
 ]
