@@ -26,7 +26,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: inference-app
+          context: "{{defaultContext}}:inference-app"
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/inference-app:${{ github.sha }}
