@@ -8,4 +8,4 @@ RUN uv sync --no-cache
 
 COPY . /app
 
-CMD ["uv", "run", "fastapi", "run", "src/app.py", "--port", "80"]
+CMD ["uv", "run", "fastapi", "run", "src/app/app.py", "--port", "80"]
