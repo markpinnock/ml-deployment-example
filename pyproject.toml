@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=62"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ml-deployment-example"
+version = "0.1.0"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.12"
+
+dependencies = [
+    "pip>=24.2",
+    "inference-app"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=4.2.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "inference-app"
+]
+
+[tool.uv.sources]
+inference-app = [{workspace = true}]
