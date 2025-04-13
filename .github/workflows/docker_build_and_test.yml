@@ -26,9 +26,10 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: inference-app
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/inference-app:${{ github.sha }}
 
       - name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
@@ -49,13 +50,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull Docker image
-        run: docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}
+        run: docker pull ghcr.io/${{ github.repository }}/inference-app:${{ github.sha }}
 
       - name: Run container tests
         run: |
           # Start the container
           docker run -d --name ml-api -p 80:80 \
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/inference-app:${{ github.sha }}
 
           # Wait for container to be ready
           sleep 10

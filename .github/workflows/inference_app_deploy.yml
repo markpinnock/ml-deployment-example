@@ -26,4 +26,4 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/ml-deployment:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/inference-app:latest
