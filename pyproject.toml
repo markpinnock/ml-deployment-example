@@ -7,15 +7,22 @@ name = "ml-deployment-example"
 version = "0.1.0"
 readme = "README.md"
 license = {file = "LICENSE"}
+requires-python = ">=3.12"
 
 dependencies = [
-    "fastapi[standard]>=0.115.12",
-    "matplotlib>=3.10.1",
-    "numpy>=2.2.4",
+    "pip>=24.2",
+    "inference-app"
+]
+
+[project.optional-dependencies]
+dev = [
     "pre-commit>=4.2.0",
 ]
 
-requires-python = ">=3.12"
+[tool.uv.workspace]
+members = [
+    "inference-app"
+]
 
-[project.scripts]
-toy_train = "cli.toy_train:main"
+[tool.uv.sources]
+inference-app = [{workspace = true}]
