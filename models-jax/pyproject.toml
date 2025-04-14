@@ -3,7 +3,7 @@ requires = ["setuptools>=62"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "models"
+name = "models-jax"
 version = "0.1.0"
 readme = "README.md"
 license = {file = "LICENSE"}
