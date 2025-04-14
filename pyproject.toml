@@ -11,18 +11,15 @@ requires-python = ">=3.12"
 
 dependencies = [
     "pip>=24.2",
-    "inference-app"
-]
-
-[project.optional-dependencies]
-dev = [
     "pre-commit>=4.2.0",
 ]
 
 [tool.uv.workspace]
 members = [
-    "inference-app"
+    "inference-app",
+    "models",
 ]
 
 [tool.uv.sources]
 inference-app = [{workspace = true}]
+models = [{workspace = true}]
