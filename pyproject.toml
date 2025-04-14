@@ -17,9 +17,11 @@ dependencies = [
 [tool.uv.workspace]
 members = [
     "inference-app",
-    "models",
+    "models-jax",
+    "models-pytorch",
 ]
 
 [tool.uv.sources]
 inference-app = [{workspace = true}]
-models = [{workspace = true}]
+models-jax = [{workspace = true}]
+models-pytorch = [{workspace = true}]
