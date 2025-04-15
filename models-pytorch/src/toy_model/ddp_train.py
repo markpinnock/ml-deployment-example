@@ -11,10 +11,10 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
-from dataloader import get_dataloaders
-from model import LinearNet
 from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
+from toy_model.dataloader import get_dataloaders
+from toy_model.model import LinearNet
 
 torch.manual_seed(5)
 
