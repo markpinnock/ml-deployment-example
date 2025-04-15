@@ -16,7 +16,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, DistributedSampler
 
 
 def setup(rank: int, world_size: int) -> None:
@@ -36,7 +36,7 @@ def cleanup() -> None:
     dist.destroy_process_group()
 
 
-class LinearNet(nn.Module):
+class LinearNet(nn.Module):  # type: ignore[misc]
     """Toy MLP, trainable on CPU."""
 
     def __init__(self, layer_dims: list[int]) -> None:
@@ -66,9 +66,42 @@ class LinearNet(nn.Module):
         return x
 
 
+class ToyLinearDataset(Dataset):  # type: ignore[misc]
+    """Toy example dataset - linear relationship"""
+
+    def __init__(self, train_split: bool):
+        """Initialise linear dataset.
+
+        Args:
+            train_split: training dataset if True (else validation)
+        """
+        super().__init__()
+
+        alpha = 0.2
+        beta = 0.4
+        sigma = 0.02
+
+        self.xs = (
+            torch.linspace(0.0, 1.0, 50)
+            if train_split
+            else torch.linspace(1.0, 1.2, 10)
+        )
+        eps = torch.randn_like(self.xs) * sigma
+        self.ys = alpha + beta * self.xs + eps
+        self.xs = self.xs.unsqueeze(1)
+        self.ys = self.ys.unsqueeze(1)
+        self.xs = torch.concat([torch.ones_like(self.xs), self.xs], dim=1)
+
+    def __len__(self) -> int:
+        return len(self.xs)
+
+    def __getitem__(self, idx: int) -> tuple[float, float]:
+        return self.xs[idx], self.ys[idx]
+
+
 def train(
     model: nn.Module,
-    train_loader,
+    train_loader: DataLoader,
     loss_obj: nn.MSELoss,
     optimiser: torch.optim.Optimizer,
     rank: int,
@@ -103,10 +136,12 @@ def train(
         ddp_loss[0] += loss.item()
         ddp_loss[1] += len(data)
 
-    return (torch.sum(ddp_loss[0]) / torch.sum(ddp_loss[1])).item()
+    return float((torch.sum(ddp_loss[0]) / torch.sum(ddp_loss[1])).item())
 
 
-def test(model: nn.Module, valid_loader, loss_obj: nn.MSELoss, rank: int) -> float:
+def test(
+    model: nn.Module, valid_loader: DataLoader, loss_obj: nn.MSELoss, rank: int
+) -> float:
     """Test after training for one epoch.
 
     Args:
@@ -133,40 +168,7 @@ def test(model: nn.Module, valid_loader, loss_obj: nn.MSELoss, rank: int) -> flo
             ddp_loss[0] += loss.item()
             ddp_loss[1] += len(data)
 
-    return (torch.sum(ddp_loss[0]) / torch.sum(ddp_loss[1])).item()
-
-
-class ToyLinearDataset(Dataset):
-    """Toy example dataset - linear relationship"""
-
-    def __init__(self, train_split: bool):
-        """Initialise linear dataset.
-
-        Args:
-            train_split: training dataset if True (else validation)
-        """
-        super().__init__()
-
-        alpha = 0.2
-        beta = 0.4
-        sigma = 0.02
-
-        self.xs = (
-            torch.linspace(0.0, 1.0, 50)
-            if train_split
-            else torch.linspace(1.0, 1.2, 10)
-        )
-        eps = torch.randn_like(self.xs) * sigma
-        self.ys = alpha + beta * self.xs + eps
-        self.xs = self.xs.unsqueeze(1)
-        self.ys = self.ys.unsqueeze(1)
-        self.xs = torch.concat([torch.ones_like(self.xs), self.xs], dim=1)
-
-    def __len__(self):
-        return len(self.xs)
-
-    def __getitem__(self, idx: int) -> tuple[float, float]:
-        return self.xs[idx], self.ys[idx]
+    return float((torch.sum(ddp_loss[0]) / torch.sum(ddp_loss[1])).item())
 
 
 def main(rank: int, world_size: int) -> None:
@@ -178,11 +180,21 @@ def main(rank: int, world_size: int) -> None:
     epochs = 100
     save_every = 10
 
+    # Set up dataloaders
     train_dataset = ToyLinearDataset(train_split=True)
     valid_dataset = ToyLinearDataset(train_split=False)
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    valid_loader = DataLoader(valid_dataset, batch_size=8, shuffle=False)
-    print(rank, False, next(iter(valid_loader))[0][:, 1])
+    train_sampler = DistributedSampler(
+        train_dataset, num_replicas=world_size, rank=rank, shuffle=True
+    )
+    valid_sampler = DistributedSampler(
+        valid_dataset, num_replicas=world_size, rank=rank, shuffle=False
+    )
+    train_loader = DataLoader(
+        train_dataset, batch_size=2, shuffle=False, sampler=train_sampler
+    )
+    valid_loader = DataLoader(
+        valid_dataset, batch_size=2, shuffle=False, sampler=valid_sampler
+    )
 
     if torch.cuda.is_available():
         model = LinearNet([2, 1]).to(rank)
@@ -200,7 +212,7 @@ def main(rank: int, world_size: int) -> None:
     if torch.cuda.is_available():
         map_location = {"cuda:0": f"cuda:{rank}"}
     else:
-        map_location = "cpu"
+        map_location = {"cpu": "cpu"}
     ddp_model.load_state_dict(
         torch.load(checkpoint_path, map_location=map_location, weights_only=True)
     )
@@ -212,9 +224,12 @@ def main(rank: int, world_size: int) -> None:
     train_losses, valid_losses = [], []
 
     for epoch in range(1, epochs + 1):
+        train_sampler.set_epoch(epoch - 1)
+        valid_sampler.set_epoch(epoch - 1)
         train_loss = train(ddp_model, train_loader, loss_obj, optimiser, rank)
         valid_loss = test(ddp_model, valid_loader, loss_obj, rank)
 
+        # Print results if main process
         if rank == 0:
             train_losses.append(train_loss)
             valid_losses.append(valid_loss)
@@ -223,7 +238,7 @@ def main(rank: int, world_size: int) -> None:
             if epoch % save_every == 0:
                 torch.save(ddp_model.state_dict(), checkpoint_path)
 
-    # Plot results
+    # Plot results if main process
     if rank == 0:
         true_train_ys = 0.2 + 0.4 * train_dataset.xs[:, 1]
         true_valid_ys = 0.2 + 0.4 * valid_dataset.xs[:, 1]
@@ -263,5 +278,5 @@ def main(rank: int, world_size: int) -> None:
 
 
 if __name__ == "__main__":
-    world_size = 8  # Number of CPU cores to use
+    world_size = 4  # Number of CPU cores to use
     mp.spawn(main, args=(world_size,), nprocs=world_size)
