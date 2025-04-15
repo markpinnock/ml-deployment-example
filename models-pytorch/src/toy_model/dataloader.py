@@ -37,7 +37,7 @@ class ToyLinearDataset(Dataset):  # type: ignore[misc]
 
 def get_dataloaders(
     world_size: int, rank: int, local_batch_size: int
-) -> tuple[DataLoader, DataLoader]:
+) -> dict[str, DataLoader | DistributedSampler | Dataset]:
     """Get dataloaders for training and validation datasets.
 
     Args:
@@ -48,6 +48,10 @@ def get_dataloaders(
     Returns:
         train_loader: training dataloader
         valid_loader: validation dataloader
+        train_sampler: training sampler
+        valid_sampler: validation sampler
+        train_dataset: training dataset
+        valid_dataset: validation dataset
     """
     train_dataset = ToyLinearDataset(train_split=True)
     valid_dataset = ToyLinearDataset(train_split=False)
@@ -64,4 +68,11 @@ def get_dataloaders(
         valid_dataset, batch_size=local_batch_size, shuffle=False, sampler=valid_sampler
     )
 
-    return train_loader, valid_loader
+    return {
+        "train_loader": train_loader,
+        "valid_loader": valid_loader,
+        "train_sampler": train_sampler,
+        "valid_sampler": valid_sampler,
+        "train_dataset": train_dataset,
+        "valid_dataset": valid_dataset,
+    }

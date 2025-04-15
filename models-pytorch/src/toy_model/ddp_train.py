@@ -1,8 +1,4 @@
 """Based on: https://pytorch.org/tutorials/intermediate/ddp_tutorial.html"""
-# https://github.com/Azure/optimized-pytorch-on-databricks-and-fabric/blob/main/Azure%20Databricks/model_training_fsdp.ipynb
-# https://pytorch.org/docs/stable/distributed.html
-# https://stackoverflow.com/questions/66226135/how-to-parallelize-a-training-loop-ever-samples-of-a-batch-when-cpu-is-only-avai
-# https://pytorch.org/docs/stable/multiprocessing.html#module-torch.multiprocessing.spawn
 
 import os
 import tempfile
@@ -15,8 +11,12 @@ import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
 import torch.nn as nn
+from dataloader import get_dataloaders
+from model import LinearNet
 from torch.nn.parallel import DistributedDataParallel
-from torch.utils.data import DataLoader, Dataset, DistributedSampler
+from torch.utils.data import DataLoader
+
+torch.manual_seed(5)
 
 
 def setup(rank: int, world_size: int) -> None:
@@ -36,69 +36,6 @@ def cleanup() -> None:
     dist.destroy_process_group()
 
 
-class LinearNet(nn.Module):  # type: ignore[misc]
-    """Toy MLP, trainable on CPU."""
-
-    def __init__(self, layer_dims: list[int]) -> None:
-        """Initialise LinearNet.
-
-        Args:
-            layer_dims: dimensions for each layer including input and output
-        """
-        super().__init__()
-        layers = []
-
-        for idx in range(len(layer_dims) - 2):
-            layers.append(
-                nn.Linear(in_features=layer_dims[idx], out_features=layer_dims[idx + 1])
-            )
-            layers.append(nn.ReLU())
-
-        layers.append(
-            nn.Linear(in_features=layer_dims[-2], out_features=layer_dims[-1])
-        )
-        self.layers = nn.ModuleList(layers)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Perform forward pass."""
-        for layer in self.layers:
-            x = layer(x)
-        return x
-
-
-class ToyLinearDataset(Dataset):  # type: ignore[misc]
-    """Toy example dataset - linear relationship"""
-
-    def __init__(self, train_split: bool):
-        """Initialise linear dataset.
-
-        Args:
-            train_split: training dataset if True (else validation)
-        """
-        super().__init__()
-
-        alpha = 0.2
-        beta = 0.4
-        sigma = 0.02
-
-        self.xs = (
-            torch.linspace(0.0, 1.0, 50)
-            if train_split
-            else torch.linspace(1.0, 1.2, 10)
-        )
-        eps = torch.randn_like(self.xs) * sigma
-        self.ys = alpha + beta * self.xs + eps
-        self.xs = self.xs.unsqueeze(1)
-        self.ys = self.ys.unsqueeze(1)
-        self.xs = torch.concat([torch.ones_like(self.xs), self.xs], dim=1)
-
-    def __len__(self) -> int:
-        return len(self.xs)
-
-    def __getitem__(self, idx: int) -> tuple[float, float]:
-        return self.xs[idx], self.ys[idx]
-
-
 def train(
     model: nn.Module,
     train_loader: DataLoader,
@@ -114,11 +51,12 @@ def train(
         loss_obj: loss function
         optimiser: optimiser
         rank: device number
+
     Returns:
         epoch training loss
     """
     model.train()
-    ddp_loss = torch.zeros(2)
+    ddp_loss = torch.zeros(2).to(rank) if torch.cuda.is_available() else torch.zeros(2)
 
     for data, labels in train_loader:
         # Forward pass
@@ -136,7 +74,8 @@ def train(
         ddp_loss[0] += loss.item()
         ddp_loss[1] += len(data)
 
-    return float((torch.sum(ddp_loss[0]) / torch.sum(ddp_loss[1])).item())
+    dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+    return float((ddp_loss[0] / ddp_loss[1]).item())
 
 
 def test(
@@ -154,7 +93,7 @@ def test(
         epoch validation loss
     """
     model.eval()
-    ddp_loss = torch.zeros(2)
+    ddp_loss = torch.zeros(2).to(rank) if torch.cuda.is_available() else torch.zeros(2)
 
     with torch.inference_mode():
         for data, labels in valid_loader:
@@ -168,7 +107,8 @@ def test(
             ddp_loss[0] += loss.item()
             ddp_loss[1] += len(data)
 
-    return float((torch.sum(ddp_loss[0]) / torch.sum(ddp_loss[1])).item())
+    dist.all_reduce(ddp_loss, op=dist.ReduceOp.SUM)
+    return float((ddp_loss[0] / ddp_loss[1]).item())
 
 
 def main(rank: int, world_size: int) -> None:
@@ -177,24 +117,14 @@ def main(rank: int, world_size: int) -> None:
 
     setup(rank, world_size)
 
-    epochs = 100
+    epochs = 50
     save_every = 10
+    learning_rate = 0.01  # * world_size
+    global_batch_size = 8
+    local_batch_size = global_batch_size // world_size
 
     # Set up dataloaders
-    train_dataset = ToyLinearDataset(train_split=True)
-    valid_dataset = ToyLinearDataset(train_split=False)
-    train_sampler = DistributedSampler(
-        train_dataset, num_replicas=world_size, rank=rank, shuffle=True
-    )
-    valid_sampler = DistributedSampler(
-        valid_dataset, num_replicas=world_size, rank=rank, shuffle=False
-    )
-    train_loader = DataLoader(
-        train_dataset, batch_size=2, shuffle=False, sampler=train_sampler
-    )
-    valid_loader = DataLoader(
-        valid_dataset, batch_size=2, shuffle=False, sampler=valid_sampler
-    )
+    data_dict = get_dataloaders(world_size, rank, local_batch_size)
 
     if torch.cuda.is_available():
         model = LinearNet([2, 1]).to(rank)
@@ -218,16 +148,18 @@ def main(rank: int, world_size: int) -> None:
     )
 
     # Set up optimiser and loss function
-    optimiser = torch.optim.Adam(ddp_model.parameters(), lr=0.01)
+    optimiser = torch.optim.Adam(ddp_model.parameters(), lr=learning_rate)
     loss_obj = nn.MSELoss(reduction="sum")
 
     train_losses, valid_losses = [], []
 
     for epoch in range(1, epochs + 1):
-        train_sampler.set_epoch(epoch - 1)
-        valid_sampler.set_epoch(epoch - 1)
-        train_loss = train(ddp_model, train_loader, loss_obj, optimiser, rank)
-        valid_loss = test(ddp_model, valid_loader, loss_obj, rank)
+        data_dict["train_sampler"].set_epoch(epoch - 1)
+        data_dict["valid_sampler"].set_epoch(epoch - 1)
+        train_loss = train(
+            ddp_model, data_dict["train_loader"], loss_obj, optimiser, rank
+        )
+        valid_loss = test(ddp_model, data_dict["valid_loader"], loss_obj, rank)
 
         # Print results if main process
         if rank == 0:
@@ -240,19 +172,19 @@ def main(rank: int, world_size: int) -> None:
 
     # Plot results if main process
     if rank == 0:
-        true_train_ys = 0.2 + 0.4 * train_dataset.xs[:, 1]
-        true_valid_ys = 0.2 + 0.4 * valid_dataset.xs[:, 1]
+        true_train_ys = 0.2 + 0.4 * data_dict["train_dataset"].xs[:, 1]
+        true_valid_ys = 0.2 + 0.4 * data_dict["valid_dataset"].xs[:, 1]
 
         with torch.inference_mode():
             train_data = (
-                train_dataset.xs.to(0)
+                data_dict["train_dataset"].xs.to(0)
                 if torch.cuda.is_available()
-                else train_dataset.xs
+                else data_dict["train_dataset"].xs
             )
             valid_data = (
-                valid_dataset.xs.to(0)
+                data_dict["valid_dataset"].xs.to(0)
                 if torch.cuda.is_available()
-                else valid_dataset.xs
+                else data_dict["valid_dataset"].xs
             )
             pred_train_ys = ddp_model(train_data).squeeze()
             pred_valid_ys = ddp_model(valid_data).squeeze()
@@ -265,10 +197,14 @@ def main(rank: int, world_size: int) -> None:
         plt.legend()
 
         plt.subplot(2, 1, 2)
-        plt.plot(train_dataset.xs[:, 1], true_train_ys, c="k", label="Train")
-        plt.scatter(train_dataset.xs[:, 1], pred_train_ys, c="k")
-        plt.plot(valid_dataset.xs[:, 1], true_valid_ys, c="r", label="Valid")
-        plt.scatter(valid_dataset.xs[:, 1], pred_valid_ys, c="r")
+        plt.plot(
+            data_dict["train_dataset"].xs[:, 1], true_train_ys, c="k", label="Train"
+        )
+        plt.scatter(data_dict["train_dataset"].xs[:, 1], pred_train_ys, c="k")
+        plt.plot(
+            data_dict["valid_dataset"].xs[:, 1], true_valid_ys, c="r", label="Valid"
+        )
+        plt.scatter(data_dict["valid_dataset"].xs[:, 1], pred_valid_ys, c="r")
         plt.show()
 
     if rank == 0:
