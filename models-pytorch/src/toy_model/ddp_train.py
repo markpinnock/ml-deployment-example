@@ -119,7 +119,7 @@ def main(rank: int, world_size: int) -> None:
 
     epochs = 50
     save_every = 10
-    learning_rate = 0.01  # * world_size
+    learning_rate = 0.01 * world_size
     global_batch_size = 8
     local_batch_size = global_batch_size // world_size
 
