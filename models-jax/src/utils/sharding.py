@@ -16,7 +16,7 @@ def named_sharding(mesh: Mesh, *names: str | None) -> NamedSharding:
     return NamedSharding(mesh, PartitionSpec(*names))
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class MeshRules:
     """Dataclass for sharding rules.
 
