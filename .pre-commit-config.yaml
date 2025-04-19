@@ -25,9 +25,10 @@ repos:
     hooks:
       # run the linter
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
+        args: [--fix, --exit-non-zero-on-fix, --exclude=notebooks/]
       # run the formatter
       - id: ruff-format
+        args: [--exclude=notebooks/]
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.19.1
@@ -58,5 +59,6 @@ repos:
           [
             --strict,
             --ignore-missing-imports,
+            --exclude=notebooks/,
           ]
         additional_dependencies: ["types-requests", "types-PyYAML"]
