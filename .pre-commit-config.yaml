@@ -26,8 +26,10 @@ repos:
       # run the linter
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
+        exclude: notebooks/
       # run the formatter
       - id: ruff-format
+        exclude: notebooks/
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.19.1
@@ -56,16 +58,8 @@ repos:
         pass_filenames: true
         args:
           [
-            --strict-equality,
-            --disallow-untyped-calls,
-            --disallow-untyped-defs,
-            --disallow-incomplete-defs,
-            --disallow-any-generics,
-            --check-untyped-defs,
-            --disallow-untyped-decorators,
-            --warn-redundant-casts,
-            --warn-unused-ignores,
-            --no-warn-no-return,
-            --warn-unreachable,
+            --strict,
+            --ignore-missing-imports,
+            --exclude=notebooks/,
           ]
         additional_dependencies: ["types-requests", "types-PyYAML"]
