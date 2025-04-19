@@ -25,10 +25,11 @@ repos:
     hooks:
       # run the linter
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix, --exclude=notebooks/]
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: notebooks/
       # run the formatter
       - id: ruff-format
-        args: [--exclude=notebooks/]
+        exclude: notebooks/
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.19.1
